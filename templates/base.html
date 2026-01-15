@@ -1,34 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>{% block title %}Law Insight{% endblock %}</title>
+  <meta charset="utf-8">
+  <title>Law Insight</title>
 
-  <!-- STATIC TỪ /public -->
+  <!-- STATIC DO VERCEL SERVE -->
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
-<header class="navbar">
-  <div class="container nav-content">
-    <div class="brand">Law Insight</div>
-    <nav>
-      <a href="#hero">Home</a>
-      <a href="#articles">Articles</a>
-      <a href="#about">About</a>
-    </nav>
-  </div>
-</header>
+{% block content %}{% endblock %}
 
-<main>
-  {% block content %}{% endblock %}
-</main>
-
-<footer class="footer">
-  <p class="footer-note">© 2025 Law Insight</p>
-</footer>
-
-<!-- fingerprint.js -->
 <script src="/js/fingerprint.js"></script>
 </body>
 </html>
