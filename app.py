@@ -18,7 +18,6 @@ def fingerprint():
         "data": data
     }
 
-    # 🔥 LOG RA VERCEL (CÁI BẠN CẦN)
     print("===== NEW VISITOR =====")
     print(log)
     print("=======================")
