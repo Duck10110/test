@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from datetime import datetime
 
 app = Flask(__name__)
@@ -18,7 +18,7 @@ def fingerprint():
         "data": data
     }
 
-    # 🔥 IN RA NGOÀI – CÁI BẠN CẦN
+    # 🔥 LOG RA VERCEL (CÁI BẠN CẦN)
     print("===== NEW VISITOR =====")
     print(log)
     print("=======================")
