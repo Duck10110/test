@@ -3,45 +3,24 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# ==========================
-# IN-MEMORY LOG (DEBUG ONLY)
-# ==========================
-FINGERPRINT_LOGS = []
-
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# ==========================
-# RECEIVE FINGERPRINT
-# ==========================
 @app.route("/api/fingerprint", methods=["POST"])
-def api_fingerprint():
+def fingerprint():
     data = request.get_json(silent=True) or {}
 
-    fp = {
-        "time": datetime.utcnow().isoformat() + "Z",
-        "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
-        "ua": request.headers.get("User-Agent"),
+    log = {
+        "time": datetime.utcnow().isoformat(),
+        "ip": request.headers.get("x-forwarded-for", request.remote_addr),
+        "ua": request.headers.get("user-agent"),
         "data": data
     }
 
-    # LƯU RAM (DEBUG)
-    FINGERPRINT_LOGS.append(fp)
-
-    # ===== LOG RA NGOÀI =====
-    print("========== NEW VISITOR ==========")
-    print(fp)
-    print("=================================")
+    # 🔥 IN RA NGOÀI – CÁI BẠN CẦN
+    print("===== NEW VISITOR =====")
+    print(log)
+    print("=======================")
 
     return jsonify({"status": "ok"})
-
-# ==========================
-# VIEW LOG LIVE (DEBUG)
-# ==========================
-@app.route("/debug/fingerprints")
-def debug_fingerprints():
-    return jsonify({
-        "count": len(FINGERPRINT_LOGS),
-        "items": FINGERPRINT_LOGS[-10:]
-    })
