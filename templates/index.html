@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Law Insight - Home{% endblock %}
+{% block content %}
+<section id="hero" class="hero">
+    <div class="container hero-content">
+        <div>
+            <p class="eyebrow">Law Insight</p>
+            <h1>Clear, Practical Legal Guidance</h1>
+            <p class="subtitle">Quick summaries on civil, IP, and employment law.</p>
+            <div class="badges">
+                <span>Up to date</span>
+                <span>Plain English</span>
+                <span>Trusted sources</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="articles" class="section">
+    <div class="container">
+        <h2>Latest Articles</h2>
+        <div class="cards">
+            {% for post in posts %}
+            <article class="card">
+                <p class="tag">{{ post.category }}</p>
+                <h3>{{ post.title }}</h3>
+                <p class="meta">By {{ post.author }} · {{ post.date }}</p>
+                <p class="excerpt">{{ post.excerpt }}</p>
+            </article>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section id="about" class="section light">
+    <div class="container">
+        <h2>About</h2>
+        <p>Law Insight distills legal topics into concise, actionable guidance so you can understand your rights and obligations quickly.</p>
+    </div>
+</section>
+{% endblock %}

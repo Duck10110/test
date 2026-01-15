@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Law Insight{% endblock %}</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container nav-content">
+    <div class="brand">Law Insight</div>
+    <nav>
+      <a href="#hero">Home</a>
+      <a href="#articles">Articles</a>
+      <a href="#about">About</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <p class="footer-note">© 2025 Law Insight</p>
+</footer>
+
+<script src="/js/fingerprint.js"></script>
+</body>
+</html>

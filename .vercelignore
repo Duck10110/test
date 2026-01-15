@@ -1,0 +1,24 @@
+# Vercel ignore file
+fingerprints/
+*.log
+.env
+.env.local
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv
+.git/
+.gitignore
+README.md
+FINGERPRINTING_GUIDE.md
+docker-compose.yml
+Dockerfile
+gunicorn_config.py
+legal-blog.service.example
+nginx.conf.example
+wsgi.py
+env.example
