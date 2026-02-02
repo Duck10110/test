@@ -1,0 +1,30 @@
+CockRoach, [Th. 2 1, 18:44 2026]
+import sys
+from textwrap import wrap
+
+CHUNK_SIZE = 800   
+
+def make_cpp_literal(name: str, b64: str, chunk_size: int = CHUNK_SIZE) -> str:
+    pieces = wrap(b64, chunk_size)
+    out = []
+    out.append(f'const char* {name} =')
+    for p in pieces:
+        p_esc = p.replace('\\', '\\\\').replace('"', '\\"')
+        out.append(f'    "{p_esc}"')
+    out[-1] = out[-1] + ';'   
+    return "\n".join(out)
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: python split_b64.py <embedded_b64.txt>", file=sys.stderr)
+        sys.exit(2)
+
+    path = sys.argv[1]
+    with open(path, "r", encoding="utf-8") as f:
+        b64 = f.read().strip().replace("\n", "")
+
+    snippet = make_cpp_literal("EMBEDDED_SHELLCODE_B64", b64, CHUNK_SIZE)
+    print(snippet)
+
+if name == "main":
+    main()
