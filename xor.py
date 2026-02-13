@@ -32,3 +32,4 @@ Header unset X-Powered-By
 Header unset Server
 Header set Server "Microsoft-IIS/10.0"
 Header set X-Content-Type-Options "nosniff"
+
